@@ -211,6 +211,7 @@ if (touchControls) {
 }
 
 bindSwipeControls();
+bindCanvasTapControls();
 
 if (rivalToggle) {
   rivalToggle.addEventListener('click', () => {
@@ -415,6 +416,26 @@ function applyVirtualDirection(label) {
   const vector = map[label];
   if (!vector) return;
   setDirection(vector.x, vector.y);
+}
+
+function bindCanvasTapControls() {
+  if (!canvas) return;
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.pointerType && event.pointerType !== 'mouse') return;
+    if (event.button !== undefined && event.button !== 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const normalizedX = (x / rect.width) * 2 - 1;
+    const normalizedY = (y / rect.height) * 2 - 1;
+    const dominantAxis = Math.max(Math.abs(normalizedX), Math.abs(normalizedY));
+    if (dominantAxis < 0.2) return;
+    if (Math.abs(normalizedX) > Math.abs(normalizedY)) {
+      applyVirtualDirection(normalizedX > 0 ? 'right' : 'left');
+    } else {
+      applyVirtualDirection(normalizedY > 0 ? 'down' : 'up');
+    }
+  });
 }
 
 function bindSwipeControls() {
