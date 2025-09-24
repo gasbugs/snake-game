@@ -1,0 +1,266 @@
+:root {
+  color-scheme: dark light;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #0d1117;
+  color: #f2f6fc;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 1.5rem;
+  width: min(1600px, calc(100vw - 3rem));
+  margin: 1.5rem auto;
+  align-items: stretch;
+}
+
+.stage {
+  position: relative;
+  width: min(
+    calc(100vw - 320px),
+    calc((100vh - 3rem) * 3 / 2),
+    1400px
+  );
+  max-width: 1400px;
+  aspect-ratio: 3 / 2;
+  background: #161b22;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.86);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.overlay[hidden] {
+  display: none !important;
+}
+
+.leaderboard {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  min-width: 180px;
+  padding: 0.75rem;
+  background: rgba(17, 24, 39, 0.82);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #f8fafc;
+  font-size: 0.8rem;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.status-banner {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  min-width: 160px;
+  padding: 0.6rem 0.9rem;
+  background: rgba(15, 23, 42, 0.82);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #f8fafc;
+  font-size: 0.85rem;
+  text-align: right;
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 2;
+}
+
+.status-banner.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.leaderboard h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.leaderboard ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  list-style-position: inside;
+}
+
+.leaderboard li.player,
+.leaderboard .player-rank {
+  color: #facc15;
+  font-weight: 600;
+}
+
+.leaderboard p {
+  margin: 0.6rem 0 0;
+}
+
+.overlay__content {
+  text-align: center;
+  line-height: 1.6;
+}
+
+.overlay--loading .overlay__button {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.overlay--loading .spinner {
+  display: block;
+}
+
+.overlay__button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.overlay__button:hover {
+  transform: translateY(-2px);
+}
+
+.spinner {
+  width: 56px;
+  height: 56px;
+  border: 6px solid rgba(148, 163, 184, 0.25);
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner[hidden] {
+  display: none;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.panel {
+  width: 260px;
+  background: rgba(9, 12, 18, 0.85);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  height: 100%;
+}
+
+.sound-toggle,
+.rival-toggle,
+.end-button {
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.14);
+  color: #e2e8f0;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.sound-toggle:hover,
+.rival-toggle:hover,
+.end-button:hover {
+  background: rgba(148, 163, 184, 0.25);
+  transform: translateY(-1px);
+}
+
+.panel h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: #c9d1d9;
+}
+
+.tagline {
+  margin: 0;
+  color: #8b949e;
+}
+
+.stats div {
+  margin-bottom: 0.4rem;
+  font-size: 0.95rem;
+}
+
+.missions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.controls {
+  font-size: 0.9rem;
+  color: #8b949e;
+}
+
+@media (max-width: 860px) {
+  body {
+    overflow: auto;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    width: min(96vw, 640px);
+  }
+
+  .stage {
+    width: 100%;
+    max-width: none;
+    aspect-ratio: 3 / 2;
+  }
+
+  .panel {
+    width: 100%;
+    height: auto;
+  }
+}

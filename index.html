@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>지렁이 아케이드</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="layout">
+    <section class="stage">
+      <canvas id="gameCanvas" width="864" height="648" aria-label="게임 화면" role="img"></canvas>
+      <div class="leaderboard" id="leaderboard"></div>
+      <div class="status-banner" id="statusBanner" aria-live="polite"></div>
+      <div class="overlay" id="overlay">
+        <div class="overlay__content" id="overlayContent"></div>
+        <div class="spinner" id="spinner" hidden></div>
+        <button class="overlay__button" id="startButton">게임 시작</button>
+      </div>
+    </section>
+    <aside class="panel">
+      <h1>지렁이 아케이드</h1>
+      <p class="tagline">먹고, 살아남고, 스페셜 미션을 완료하세요!</p>
+      <div class="stats">
+        <div>점수: <span id="score">0</span></div>
+        <div>최고 점수: <span id="highScore">0</span></div>
+        <div>생존 시간: <span id="survival">0s</span></div>
+        <div>파워업: <span id="powerup">없음</span></div>
+        <div>경쟁 점수: <span id="rivalScore">-</span></div>
+        <div>경쟁 상태: <span id="rivalStatus">비활성</span></div>
+        <div>좌표: <span id="coordinates">(0,0)</span></div>
+      </div>
+      <button class="sound-toggle" id="soundToggle" type="button">🔊 사운드 ON</button>
+      <section class="missions">
+        <h2>일일 미션</h2>
+        <ul>
+          <li id="mission-survive">120초 생존 (진행: <span>0</span>s)</li>
+          <li id="mission-powerup">파워업 3회 사용 (진행: <span>0</span>/3)</li>
+          <li id="mission-superfood">스페셜 먹이 2개 섭취 (진행: <span>0</span>/2)</li>
+        </ul>
+      </section>
+      <section class="controls">
+        <h2>조작법</h2>
+        <p>화살표 또는 WASD로 이동하세요. 스페이스바는 일시정지입니다.</p>
+        <button class="rival-toggle" id="rivalToggle" type="button">🤖 경쟁자 OFF</button>
+        <button class="end-button" id="endButton" type="button">게임 종료</button>
+      </section>
+    </aside>
+  </main>
+  <script src="game.js" type="module"></script>
+</body>
+</html>
