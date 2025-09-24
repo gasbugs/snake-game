@@ -20,6 +20,7 @@ const leaderboardEl = document.getElementById('leaderboard');
 const statusLog = document.getElementById('statusLog');
 const endButton = document.getElementById('endButton');
 const spinnerEl = document.getElementById('spinner');
+const touchControls = document.getElementById('touchControls');
 
 const soundManager = (() => {
   const StorageKey = 'wormSoundMuted';
@@ -137,10 +138,12 @@ const soundManager = (() => {
 })();
 
 const GRID_SIZE = 1000;
-const VIEWPORT_WIDTH = 36;
-const VIEWPORT_HEIGHT = 24;
+const BASE_VIEWPORT_WIDTH = 36;
+const BASE_VIEWPORT_HEIGHT = 24;
+let viewportWidth = BASE_VIEWPORT_WIDTH;
+let viewportHeight = BASE_VIEWPORT_HEIGHT;
 const CAMERA_CENTER_TOLERANCE = 3;
-let tileSize = canvas.width / VIEWPORT_WIDTH;
+let tileSize = canvas.width / viewportWidth;
 const MIN_FOOD_BASE = 1;
 const MIN_FOOD_WITH_RIVAL = 10000;
 const RIVAL_COUNT = 100;
@@ -203,6 +206,12 @@ if (soundToggle) {
   });
 }
 
+if (touchControls) {
+  initTouchControls();
+}
+
+bindSwipeControls();
+
 if (rivalToggle) {
   rivalToggle.addEventListener('click', () => {
     rivalEnabled = !rivalEnabled;
@@ -218,6 +227,11 @@ if (rivalToggle) {
 }
 
 window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    handleResize();
+  }, 180);
+});
 
 if (endButton) {
   endButton.addEventListener('click', () => {
@@ -249,12 +263,12 @@ function updateRivalStatusUI() {
     }
   }
   if (rivalStatusEl) {
-    let label = '비활성';
-    if (activeRivals.length) {
-      label = `${aliveCount}명 생존 / ${activeRivals.length}명`; // alive vs total
-    } else if (rivalEnabled) {
-      label = '대기';
-    }
+    const entries = aliveRivals.map((rival) => rival.score);
+    entries.push(score);
+    entries.sort((a, b) => b - a);
+    const playerRank = entries.indexOf(score) + 1;
+    const totalCompetitors = aliveCount + 1;
+    const label = rivalEnabled ? `${playerRank}위 / ${totalCompetitors}명` : '단독 플레이';
     rivalStatusEl.textContent = label;
   }
   if (coordEl) {
@@ -266,12 +280,23 @@ function updateRivalStatusUI() {
   }
 }
 
+function adjustViewportForScreen() {
+  viewportWidth = BASE_VIEWPORT_WIDTH;
+  viewportHeight = BASE_VIEWPORT_HEIGHT;
+  const aspect = window.innerHeight / Math.max(window.innerWidth, 1);
+  if (aspect > 1.2) {
+    const scaledHeight = Math.round(BASE_VIEWPORT_HEIGHT * Math.min(aspect, 1.8));
+    viewportHeight = Math.min(Math.max(scaledHeight, BASE_VIEWPORT_HEIGHT), GRID_SIZE - 1);
+  }
+}
+
 function resizeCanvas() {
   if (!stageEl) return;
+  adjustViewportForScreen();
   const width = Math.floor(stageEl.clientWidth);
   if (!width) return;
-  const tile = width / VIEWPORT_WIDTH;
-  const height = Math.round(tile * VIEWPORT_HEIGHT);
+  const tile = width / viewportWidth;
+  const height = Math.round(tile * viewportHeight);
   if (canvas.width !== width) {
     canvas.width = width;
   }
@@ -326,6 +351,10 @@ function showStatusMessage(text, duration = 2200) {
 
 function pushStatusLog(text, duration = 5000) {
   if (!statusLog) return;
+  while (statusLogEntries.length >= 4) {
+    const oldest = statusLogEntries[0];
+    removeStatusLogEntry(oldest.element, true);
+  }
   const entry = document.createElement('div');
   entry.className = 'status-log__entry';
   entry.textContent = text;
@@ -351,6 +380,82 @@ function removeStatusLogEntry(entry, immediate = false) {
   setTimeout(() => {
     entry.remove();
   }, 180);
+}
+
+function initTouchControls() {
+  const directionButtons = touchControls.querySelectorAll('[data-direction]');
+  directionButtons.forEach((button) => {
+    button.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const dir = event.currentTarget.getAttribute('data-direction');
+      applyVirtualDirection(dir);
+    });
+  });
+  const pauseButton = touchControls.querySelector('[data-action=\'pause\']');
+  if (pauseButton) {
+    pauseButton.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      if (!running) {
+        startGame();
+        return;
+      }
+      togglePause();
+    });
+  }
+}
+
+function applyVirtualDirection(label) {
+  if (!label) return;
+  const map = {
+    up: { x: 0, y: -1 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 },
+  };
+  const vector = map[label];
+  if (!vector) return;
+  setDirection(vector.x, vector.y);
+}
+
+function bindSwipeControls() {
+  if (!canvas) return;
+  let startPoint = null;
+  const threshold = 30;
+
+  function extractPoint(event) {
+    if (event.changedTouches && event.changedTouches[0]) {
+      const touch = event.changedTouches[0];
+      return { x: touch.clientX, y: touch.clientY };
+    }
+    return { x: event.clientX, y: event.clientY };
+  }
+
+  canvas.addEventListener('touchstart', (event) => {
+    startPoint = extractPoint(event);
+  });
+
+  canvas.addEventListener('touchmove', (event) => {
+    event.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (event) => {
+    if (!startPoint) return;
+    const endPoint = extractPoint(event);
+    const dx = endPoint.x - startPoint.x;
+    const dy = endPoint.y - startPoint.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (Math.max(absX, absY) < threshold) {
+      startPoint = null;
+      return;
+    }
+    if (absX > absY) {
+      applyVirtualDirection(dx > 0 ? 'right' : 'left');
+    } else {
+      applyVirtualDirection(dy > 0 ? 'down' : 'up');
+    }
+    startPoint = null;
+  });
 }
 
 function clearStatusLog() {
@@ -583,10 +688,10 @@ function resetCamera() {
     return;
   }
   const head = snake[0];
-  const maxOffsetX = GRID_SIZE - VIEWPORT_WIDTH;
-  const maxOffsetY = GRID_SIZE - VIEWPORT_HEIGHT;
-  const halfWidth = Math.floor(VIEWPORT_WIDTH / 2);
-  const halfHeight = Math.floor(VIEWPORT_HEIGHT / 2);
+  const maxOffsetX = GRID_SIZE - viewportWidth;
+  const maxOffsetY = GRID_SIZE - viewportHeight;
+  const halfWidth = Math.floor(viewportWidth / 2);
+  const halfHeight = Math.floor(viewportHeight / 2);
   camera.x = clamp(head.x - halfWidth, 0, Math.max(0, maxOffsetX));
   camera.y = clamp(head.y - halfHeight, 0, Math.max(0, maxOffsetY));
 }
@@ -594,10 +699,10 @@ function resetCamera() {
 function updateCamera(force = false) {
   if (!snake.length) return;
   const head = snake[0];
-  const maxOffsetX = GRID_SIZE - VIEWPORT_WIDTH;
-  const maxOffsetY = GRID_SIZE - VIEWPORT_HEIGHT;
-  const halfWidth = Math.floor(VIEWPORT_WIDTH / 2);
-  const halfHeight = Math.floor(VIEWPORT_HEIGHT / 2);
+  const maxOffsetX = GRID_SIZE - viewportWidth;
+  const maxOffsetY = GRID_SIZE - viewportHeight;
+  const halfWidth = Math.floor(viewportWidth / 2);
+  const halfHeight = Math.floor(viewportHeight / 2);
 
   if (force) {
     camera.x = clamp(head.x - halfWidth, 0, Math.max(0, maxOffsetX));
@@ -1246,8 +1351,8 @@ function render() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.fillStyle = '#111827';
-  for (let i = 0; i < VIEWPORT_WIDTH; i++) {
-    for (let j = 0; j < VIEWPORT_HEIGHT; j++) {
+  for (let i = 0; i < viewportWidth; i++) {
+    for (let j = 0; j < viewportHeight; j++) {
       const worldX = camera.x + i;
       const worldY = camera.y + j;
       const onEdge =
@@ -1269,7 +1374,7 @@ function render() {
   foods.forEach((food) => {
     const sx = food.x - camera.x;
     const sy = food.y - camera.y;
-    if (sx < 0 || sy < 0 || sx >= VIEWPORT_WIDTH || sy >= VIEWPORT_HEIGHT) return;
+    if (sx < 0 || sy < 0 || sx >= viewportWidth || sy >= viewportHeight) return;
     ctx.fillStyle = food.type === 'special' ? '#facc15' : '#22d3ee';
     ctx.beginPath();
     ctx.arc(
@@ -1285,7 +1390,7 @@ function render() {
   powerups.forEach((power) => {
     const sx = power.x - camera.x;
     const sy = power.y - camera.y;
-    if (sx < 0 || sy < 0 || sx >= VIEWPORT_WIDTH || sy >= VIEWPORT_HEIGHT) return;
+    if (sx < 0 || sy < 0 || sx >= viewportWidth || sy >= viewportHeight) return;
     ctx.fillStyle = '#a855f7';
     ctx.fillRect(
       sx * tileSize + tileSize * 0.15,
@@ -1300,7 +1405,7 @@ function render() {
     rival.snake.forEach((segment, index) => {
       const sx = segment.x - camera.x;
       const sy = segment.y - camera.y;
-      if (sx < 0 || sy < 0 || sx >= VIEWPORT_WIDTH || sy >= VIEWPORT_HEIGHT) return;
+      if (sx < 0 || sy < 0 || sx >= viewportWidth || sy >= viewportHeight) return;
       ctx.fillStyle = index === 0 ? '#f97316' : '#fb923c';
       ctx.fillRect(sx * tileSize, sy * tileSize, tileSize, tileSize);
     });
@@ -1309,7 +1414,7 @@ function render() {
   if (bossState.obstacle) {
     const sx = bossState.obstacle.x - camera.x;
     const sy = bossState.obstacle.y - camera.y;
-    if (sx >= 0 && sy >= 0 && sx < VIEWPORT_WIDTH && sy < VIEWPORT_HEIGHT) {
+    if (sx >= 0 && sy >= 0 && sx < viewportWidth && sy < viewportHeight) {
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(
         sx * tileSize,
@@ -1323,7 +1428,7 @@ function render() {
   snake.forEach((segment, index) => {
     const sx = segment.x - camera.x;
     const sy = segment.y - camera.y;
-    if (sx < 0 || sy < 0 || sx >= VIEWPORT_WIDTH || sy >= VIEWPORT_HEIGHT) return;
+    if (sx < 0 || sy < 0 || sx >= viewportWidth || sy >= viewportHeight) return;
     ctx.fillStyle = index === 0 ? '#34d399' : '#10b981';
     ctx.fillRect(sx * tileSize, sy * tileSize, tileSize, tileSize);
   });
@@ -1333,7 +1438,7 @@ function render() {
     if (head) {
       const sx = head.x - camera.x;
       const sy = head.y - camera.y;
-      if (sx >= 0 && sy >= 0 && sx < VIEWPORT_WIDTH && sy < VIEWPORT_HEIGHT) {
+      if (sx >= 0 && sy >= 0 && sx < viewportWidth && sy < viewportHeight) {
         ctx.strokeStyle = '#fde68a';
         ctx.lineWidth = 3;
         ctx.strokeRect(sx * tileSize + 2, sy * tileSize + 2, tileSize - 4, tileSize - 4);
