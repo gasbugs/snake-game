@@ -1,29 +1,16 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `index.html` binds the canvas, wires UI events, and loads the ES module entrypoint.
-- `game.js` holds gameplay, mission tracking, and rendering logic—group related helpers near their usage.
-- `styles.css` defines layout and theme tokens; keep shared values under the top-level `:root` block.
-- `plan.md` captures design notes before they graduate into code; update or prune it when features ship.
+This arcade snake project is lean: `index.html` anchors the canvas, wires UI controls, and loads the ES module entrypoint. Core gameplay, mission tracking, and rendering stay together in `game.js`; keep helper functions near their call sites so movement, collision, and boss logic remain readable. Shared layout tokens and colors live in `styles.css` under the top-level `:root` block. Use `plan.md` for design notes and TODOs—update it when a feature ships so it reflects the current roadmap.
 
 ## Build, Test, and Development Commands
-- `python3 -m http.server 8000` — serves the project at http://localhost:8000 for quick playtesting.
-- `npx http-server .` — Node-based static server alternative; use when Python is unavailable.
-- Reload the browser after edits; perform a hard refresh when assets or styles change.
+Spin up a local server with `python3 -m http.server 8000` and browse to `http://localhost:8000` for quick playtesting. If Python is unavailable, `npx http-server .` offers the same static hosting. After asset or CSS tweaks, force a hard refresh to pick up cache-busted changes.
 
 ## Coding Style & Naming Conventions
-- Use modern ES modules with `const`/`let`; favor arrow functions for callbacks and inline handlers.
-- Follow two-space indentation and camelCase identifiers; reserve `SCREAMING_SNAKE_CASE` for constants.
-- Keep DOM ids/classes in kebab-case to match existing selectors and CSS conventions.
-- Add concise inline comments only where logic is non-obvious; keep the rest self-documenting.
+Write modern ES modules with `const`/`let`, and prefer arrow functions for callbacks bound to game events. Use two-space indentation throughout. Stick to camelCase for variables and functions, reserve `SCREAMING_SNAKE_CASE` for constants like `TICK_RATE`, and keep DOM ids/classes in kebab-case to match existing selectors. Add brief comments only when logic is non-obvious—self-documenting code is the default.
 
 ## Testing Guidelines
-- No automated suite yet. After changes, run a local server and verify snake movement, scoring, mission counters, power-up pickup, boss behavior, and pause/resume flows.
-- Confirm `localStorage` persists the high score between sessions and that mission state resets appropriately.
-- Document manual steps in PR descriptions to build institutional knowledge for future regression sweeps.
+There is no automated suite yet, so rely on manual sweeps. After each change, run a local server, then verify snake movement, scoring updates, mission counters, power-up behavior, boss phases, and pause/resume controls. Refresh the page to confirm `localStorage` persists the high score while mission state resets. Capture the exact manual test actions in your PR notes for future regression coverage.
 
 ## Commit & Pull Request Guidelines
-- Use Conventional Commit prefixes (e.g., `feat:`, `fix:`, `refactor:`) with imperative subjects under 72 characters.
-- Squash work-in-progress commits before opening a PR.
-- PRs should summarize the change, include screenshots or GIFs for UI updates, list repro steps, and note manual testing results.
-- Reference related issues with `Fixes #id` when applicable and highlight any follow-up work or open questions.
+Use Conventional Commit prefixes (e.g., `feat: add sprint power-up`, `fix: reset mission timer`) with subjects under 72 characters. Squash WIP commits before pushing. PRs should summarize the change, include screenshots or GIFs for visual updates, list reproduction steps, and document manual testing results. Reference related issues with `Fixes #id` and call out follow-up work or open questions. Link updates to `plan.md` when relevant.
