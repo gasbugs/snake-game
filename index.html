@@ -11,7 +11,7 @@
     <section class="stage">
       <canvas id="gameCanvas" width="864" height="648" aria-label="게임 화면" role="img"></canvas>
       <div class="leaderboard" id="leaderboard"></div>
-      <div class="status-banner" id="statusBanner" aria-live="polite"></div>
+      <div class="status-log" id="statusLog" aria-live="polite"></div>
       <div class="overlay" id="overlay">
         <div class="overlay__content" id="overlayContent"></div>
         <div class="spinner" id="spinner" hidden></div>
@@ -26,8 +26,8 @@
         <div>최고 점수: <span id="highScore">0</span></div>
         <div>생존 시간: <span id="survival">0s</span></div>
         <div>파워업: <span id="powerup">없음</span></div>
-        <div>경쟁 점수: <span id="rivalScore">-</span></div>
-        <div>경쟁 상태: <span id="rivalStatus">비활성</span></div>
+        <div>경쟁지렁이 점수: <span id="rivalScore">-</span></div>
+        <div>경쟁지렁이 상태: <span id="rivalStatus">비활성</span></div>
         <div>좌표: <span id="coordinates">(0,0)</span></div>
       </div>
       <button class="sound-toggle" id="soundToggle" type="button">🔊 사운드 ON</button>
@@ -42,7 +42,7 @@
       <section class="controls">
         <h2>조작법</h2>
         <p>화살표 또는 WASD로 이동하세요. 스페이스바는 일시정지입니다.</p>
-        <button class="rival-toggle" id="rivalToggle" type="button">🤖 경쟁자 OFF</button>
+        <button class="rival-toggle" id="rivalToggle" type="button">🤖 경쟁지렁이 OFF</button>
         <button class="end-button" id="endButton" type="button">게임 종료</button>
       </section>
     </aside>

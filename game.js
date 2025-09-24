@@ -17,7 +17,7 @@ const rivalScoreEl = document.getElementById('rivalScore');
 const rivalStatusEl = document.getElementById('rivalStatus');
 const coordEl = document.getElementById('coordinates');
 const leaderboardEl = document.getElementById('leaderboard');
-const statusBanner = document.getElementById('statusBanner');
+const statusLog = document.getElementById('statusLog');
 const endButton = document.getElementById('endButton');
 const spinnerEl = document.getElementById('spinner');
 
@@ -156,6 +156,8 @@ const DAY_MISSIONS = {
 };
 const RIVAL_STORAGE_KEY = 'wormRivalEnabled';
 
+const RESPAWN_DELAY_SECONDS = 5;
+const RESPAWN_DELAY_MS = RESPAWN_DELAY_SECONDS * 1000;
 let snake = [];
 let direction = { x: 1, y: 0 };
 let pendingDirection = { x: 1, y: 0 };
@@ -178,7 +180,9 @@ let bossState = { active: false, timer: 0, obstacle: null };
 let rivalEnabled = localStorage.getItem(RIVAL_STORAGE_KEY) === 'true';
 let rivals = [];
 const camera = { x: 0, y: 0 };
-let statusMessageTimer = null;
+const statusLogEntries = [];
+let playerRespawning = false;
+let playerRespawnTimer = null;
 
 highScoreEl.textContent = highScore;
 updateRivalToggleLabel();
@@ -207,7 +211,7 @@ if (rivalToggle) {
     updateRivalStatusUI();
     if (!running) {
       overlayContent.innerHTML = rivalEnabled
-        ? '<h2>지렁이 아케이드</h2><p>경쟁자를 켜고 우위를 지키세요!<br/>게임 시작을 눌러 대비하세요.</p>'
+        ? '<h2>지렁이 아케이드</h2><p>경쟁지렁이를 켜고 우위를 지키세요!<br/>게임 시작을 눌러 대비하세요.</p>'
         : '<h2>지렁이 아케이드</h2><p>먹이를 먹고 파워업을 활용해 생존하세요!<br/>스페셜 먹이와 보스 웨이브를 조심!</p>';
     }
   });
@@ -226,7 +230,7 @@ if (endButton) {
 
 function updateRivalToggleLabel() {
   if (!rivalToggle) return;
-  rivalToggle.textContent = rivalEnabled ? '🤖 경쟁자 ON' : '🤖 경쟁자 OFF';
+  rivalToggle.textContent = rivalEnabled ? '🤖 경쟁지렁이 ON' : '🤖 경쟁지렁이 OFF';
   rivalToggle.setAttribute('aria-pressed', rivalEnabled ? 'true' : 'false');
 }
 
@@ -285,19 +289,24 @@ function handleResize() {
   render();
 }
 
-function handleRivalElimination(rival, message) {
+function handleRivalElimination(rival, cause) {
   if (!rival.alive) return;
   rival.alive = false;
   rival.snake = [];
+  rival.score = 0;
+  rival.respawning = true;
   if (rival.respawnTimer) {
     clearTimeout(rival.respawnTimer);
   }
+  const rivalName = `경쟁지렁이 ${rival.id + 1}번`;
+  const deathMessage = cause ? `${rivalName}이 ${cause}` : `${rivalName}이 사망했습니다.`;
+  showStatusMessage(`${deathMessage} 잠시 후 복귀합니다.`, 5000);
   rival.respawnTimer = setTimeout(() => {
     rival.respawnTimer = null;
     respawnRival(rival);
-  }, 900);
+  }, RESPAWN_DELAY_MS);
   updateRivalStatusUI();
-  checkAllRivalsDefeated(message);
+  checkAllRivalsDefeated(deathMessage);
 }
 
 function checkAllRivalsDefeated(message) {
@@ -305,20 +314,53 @@ function checkAllRivalsDefeated(message) {
   if (!rivals.length) return;
   const remaining = rivals.some((r) => r.active && r.alive);
   if (!remaining) {
-    showStatusMessage((message ? `${message} ` : '') + '경쟁자를 재배치 중...');
+    const prefix = message ? `${message} ` : '';
+    showStatusMessage(`${prefix}모든 경쟁지렁이가 잠시 퇴장했습니다.`, 5000);
   }
 }
 
 function showStatusMessage(text, duration = 2200) {
-  if (!statusBanner) return;
-  statusBanner.textContent = text;
-  statusBanner.classList.add('visible');
-  if (statusMessageTimer) {
-    clearTimeout(statusMessageTimer);
-  }
-  statusMessageTimer = setTimeout(() => {
-    statusBanner.classList.remove('visible');
+  if (!text) return;
+  pushStatusLog(text, duration);
+}
+
+function pushStatusLog(text, duration = 5000) {
+  if (!statusLog) return;
+  const entry = document.createElement('div');
+  entry.className = 'status-log__entry';
+  entry.textContent = text;
+  statusLog.appendChild(entry);
+  const timer = setTimeout(() => {
+    removeStatusLogEntry(entry);
   }, duration);
+  statusLogEntries.push({ element: entry, timer });
+}
+
+function removeStatusLogEntry(entry, immediate = false) {
+  const index = statusLogEntries.findIndex((item) => item.element === entry);
+  if (index !== -1) {
+    clearTimeout(statusLogEntries[index].timer);
+    statusLogEntries.splice(index, 1);
+  }
+  if (!statusLog || !entry || !entry.parentElement) return;
+  if (immediate) {
+    entry.remove();
+    return;
+  }
+  entry.classList.add('status-log__entry--removing');
+  setTimeout(() => {
+    entry.remove();
+  }, 180);
+}
+
+function clearStatusLog() {
+  while (statusLogEntries.length) {
+    const { element } = statusLogEntries[0];
+    removeStatusLogEntry(element, true);
+  }
+  if (statusLog) {
+    statusLog.innerHTML = '';
+  }
 }
 
 function showSpinner(visible) {
@@ -327,53 +369,70 @@ function showSpinner(visible) {
 }
 
 function respawnPlayer(message) {
-  if (message) {
-    showStatusMessage(message);
-  }
+  if (!running) return;
+  if (playerRespawning) return;
+  const base = message ? `플레이어가 사망했습니다. ${message}` : '플레이어가 사망했습니다.';
+  const notice = `${base} ${RESPAWN_DELAY_SECONDS}초 후 리스폰합니다.`;
+  showStatusMessage(notice, RESPAWN_DELAY_MS);
+  playerRespawning = true;
+  score = 0;
+  activePowerup = null;
   snake = [];
+  moveTimer = 0;
+  speed = BASE_SPEED;
+  pendingDirection = { x: 1, y: 0 };
+  updateUI();
+  if (overlay) {
+    overlay.hidden = false;
+    overlay.classList.add('overlay--loading');
+    overlayContent.innerHTML = '<h2>리스폰 준비 중</h2><p>곧 돌아옵니다...</p>';
+  }
+  startButton.textContent = '리스폰 대기';
+  showSpinner(true);
+  if (playerRespawnTimer) {
+    clearTimeout(playerRespawnTimer);
+  }
+  playerRespawnTimer = setTimeout(() => {
+    completePlayerRespawn();
+  }, RESPAWN_DELAY_MS);
+}
+
+function completePlayerRespawn() {
+  playerRespawnTimer = null;
+  if (!running) {
+    playerRespawning = false;
+    resetPlayerRespawnVisuals();
+    return;
+  }
   const spawn = randomEmptyCell();
   if (!spawn) {
+    playerRespawning = false;
+    resetPlayerRespawnVisuals();
     endGame('rival', '리스폰할 공간이 없습니다.');
     return;
   }
-  snake = [spawn];
-  const directions = shuffleDirections([
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-  ]);
-  let chosen = directions.find((dir) => {
-    const tail1 = wrapIfInside({ x: spawn.x - dir.x, y: spawn.y - dir.y });
-    const tail2 = wrapIfInside({ x: tail1.x - dir.x, y: tail1.y - dir.y });
-    return isCellFree(tail1) && isCellFree(tail2);
-  });
-  if (!chosen) {
-    chosen = { x: 1, y: 0 };
-  }
-  const tail1 = wrapIfInside({ x: spawn.x - chosen.x, y: spawn.y - chosen.y });
-  const tail2 = wrapIfInside({ x: tail1.x - chosen.x, y: tail1.y - chosen.y });
-  let segments = [spawn];
-  if (isCellFree(tail1) && isCellFree(tail2)) {
-    segments.push(tail1, tail2);
-  } else {
-    const extras = collectFreeCells(new Set([`${spawn.x},${spawn.y}`]), 2);
-    segments = segments.concat(extras);
-  }
-  if (segments.length < 3) {
-    const exclude = new Set(segments.map((cell) => `${cell.x},${cell.y}`));
-    const fillers = collectFreeCells(exclude, 3 - segments.length);
-    segments = segments.concat(fillers);
-  }
+  const { segments, direction: heading } = generateSpawnSegments(spawn);
   snake = segments;
-  direction = { ...chosen };
-  pendingDirection = { ...chosen };
+  direction = { ...heading };
+  pendingDirection = { ...heading };
   moveTimer = 0;
   speed = BASE_SPEED;
   activePowerup = null;
+  playerRespawning = false;
+  resetPlayerRespawnVisuals();
   updateCamera(true);
   updateUI();
   render();
+}
+
+function resetPlayerRespawnVisuals() {
+  if (overlay) {
+    overlay.classList.remove('overlay--loading');
+    overlayContent.innerHTML = '';
+    overlay.hidden = true;
+  }
+  showSpinner(false);
+  startButton.textContent = '게임 시작';
 }
 
 function respawnRival(rival) {
@@ -387,6 +446,16 @@ function respawnRival(rival) {
     }, 600);
     return;
   }
+  const { segments, direction: heading } = generateSpawnSegments(spawn);
+  rival.snake = segments;
+  rival.direction = { ...heading };
+  rival.alive = true;
+  rival.respawning = false;
+  rival.score = 0;
+  updateRivalStatusUI();
+}
+
+function generateSpawnSegments(spawn) {
   const directions = shuffleDirections([
     { x: 1, y: 0 },
     { x: -1, y: 0 },
@@ -405,7 +474,6 @@ function respawnRival(rival) {
   const tail2 = wrapIfInside({ x: tail1.x - chosen.x, y: tail1.y - chosen.y });
   const segments = [spawn];
   const exclude = new Set([`${spawn.x},${spawn.y}`]);
-
   if (isCellFree(tail1)) {
     segments.push(tail1);
     exclude.add(`${tail1.x},${tail1.y}`);
@@ -414,7 +482,6 @@ function respawnRival(rival) {
     segments.push(tail2);
     exclude.add(`${tail2.x},${tail2.y}`);
   }
-
   if (segments.length < 3) {
     const fillers = collectFreeCells(exclude, 3 - segments.length);
     fillers.forEach((cell) => {
@@ -422,13 +489,8 @@ function respawnRival(rival) {
       exclude.add(`${cell.x},${cell.y}`);
     });
   }
-
-  rival.snake = segments;
-  rival.direction = { ...chosen };
-  rival.alive = true;
-  updateRivalStatusUI();
+  return { segments, direction: chosen };
 }
-
 function shuffleDirections(array) {
   const copy = array.slice();
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -472,7 +534,7 @@ function collectFreeCells(excludeSet, count) {
 
 function updateLeaderboard(aliveRivals) {
   const entries = aliveRivals.map((rival, index) => ({
-    name: `경쟁자 ${index + 1}`,
+    name: `경쟁지렁이 ${index + 1}번`,
     score: rival.score,
   }));
   entries.push({ name: '플레이어', score, isPlayer: true });
@@ -494,6 +556,24 @@ function updateLeaderboard(aliveRivals) {
   const rank = playerIndex + 1;
   lines.push(`<p class="player-rank">플레이어 순위: ${rank}위 / ${entries.length}명</p>`);
   leaderboardEl.innerHTML = lines.join('');
+  if (rivalEnabled) {
+    maybeTriggerVictory(aliveRivals);
+  }
+}
+
+function maybeTriggerVictory(aliveRivals) {
+  if (!running) return;
+  if (playerRespawning) return;
+  const activeRivals = rivals.filter((r) => r.active);
+  if (!activeRivals.length) return;
+  if (!aliveRivals.length) {
+    endGame('player', '플레이어가 최후의 생존자가 되었습니다!');
+    return;
+  }
+  const topScore = aliveRivals.reduce((max, rival) => Math.max(max, rival.score), 0);
+  if (score > topScore) {
+    endGame('player', '플레이어가 1위를 달성했습니다!');
+  }
 }
 
 function resetCamera() {
@@ -577,6 +657,13 @@ function startGame() {
 }
 
 function resetState() {
+  if (playerRespawnTimer) {
+    clearTimeout(playerRespawnTimer);
+    playerRespawnTimer = null;
+  }
+  playerRespawning = false;
+  resetPlayerRespawnVisuals();
+  clearStatusLog();
   rivals.forEach((rival) => {
     if (rival.respawnTimer) {
       clearTimeout(rival.respawnTimer);
@@ -631,6 +718,7 @@ function initRivals() {
       id: i,
       active: true,
       alive: true,
+      respawning: false,
       snake: [head],
       direction: dir,
       score: 0,
@@ -674,12 +762,13 @@ function handleKey(event) {
 }
 
 function setDirection(x, y) {
-  if (paused) return;
+  if (paused || playerRespawning) return;
   if (-x === direction.x && -y === direction.y) return;
   pendingDirection = { x, y };
 }
 
 function togglePause() {
+  if (playerRespawning) return;
   paused = !paused;
   overlay.hidden = !paused;
   overlayContent.innerHTML = paused ? '<h2>일시정지</h2><p>스페이스바로 재개</p>' : '';
@@ -773,6 +862,7 @@ function getEffectiveSpeed() {
 
 function moveSnake() {
   if (!running) return;
+  if (!snake.length) return;
   direction = pendingDirection;
   const head = snake[0];
   let newHead = { x: head.x + direction.x, y: head.y + direction.y };
@@ -818,14 +908,14 @@ function moveSnake() {
     return rivalHead && rivalHead.x === newHead.x && rivalHead.y === newHead.y;
   });
   if (headClash) {
-    respawnPlayer('경쟁자와 정면으로 충돌했습니다!');
+    respawnPlayer('경쟁지렁이와 정면으로 충돌했습니다!');
     return;
   }
   const bodyHit = aliveRivals.some((r) =>
     r.snake.slice(1).some((segment) => segment.x === newHead.x && segment.y === newHead.y)
   );
   if (bodyHit) {
-    respawnPlayer('경쟁자와 충돌했습니다!');
+    respawnPlayer('경쟁지렁이와 충돌했습니다!');
     return;
   }
 
@@ -876,26 +966,26 @@ function moveSingleRival(rival) {
   }
 
   if (bossState.obstacle && newHead.x === bossState.obstacle.x && newHead.y === bossState.obstacle.y) {
-    handleRivalElimination(rival, '경쟁자가 보스 장애물에 맞았습니다!');
+    handleRivalElimination(rival, '보스 장애물에 맞았습니다!');
     return;
   }
 
   const playerHead = snake[0];
   if (playerHead && playerHead.x === newHead.x && playerHead.y === newHead.y) {
-    respawnPlayer('경쟁자에게 정면으로 맞았습니다!');
+    respawnPlayer('경쟁지렁이에게 정면으로 맞았습니다!');
     return;
   }
 
   const hitsPlayerBody = snake.slice(1).some((segment) => segment.x === newHead.x && segment.y === newHead.y);
   if (hitsPlayerBody) {
-    handleRivalElimination(rival, '경쟁자가 당신의 몸체에 부딪혔습니다!');
+    handleRivalElimination(rival, '플레이어의 몸체에 부딪혔습니다!');
     return;
   }
 
   const rivalBody = rival.snake.slice(1);
   const hitsSelf = rivalBody.some((segment) => segment.x === newHead.x && segment.y === newHead.y);
   if (hitsSelf) {
-    handleRivalElimination(rival, '경쟁자가 스스로 꼬리에 걸려 넘어졌습니다!');
+    handleRivalElimination(rival, '자기 꼬리에 걸려 넘어졌습니다!');
     return;
   }
 
@@ -904,9 +994,9 @@ function moveSingleRival(rival) {
     other.snake.some((segment, index) => {
       if (segment.x !== newHead.x || segment.y !== newHead.y) return false;
       if (index === 0) {
-        handleRivalElimination(other, '경쟁자들끼리 충돌했습니다.');
+        handleRivalElimination(other, '다른 경쟁지렁이와 충돌했습니다.');
       }
-      handleRivalElimination(rival, '경쟁자들끼리 충돌했습니다.');
+      handleRivalElimination(rival, '다른 경쟁지렁이와 충돌했습니다.');
       return true;
     })
   );
@@ -1054,16 +1144,22 @@ function endGame(outcome, message) {
   if (!running) return false;
   running = false;
   paused = false;
-  overlay.hidden = false;
-  if (statusBanner) {
-    statusBanner.classList.remove('visible');
+  if (playerRespawnTimer) {
+    clearTimeout(playerRespawnTimer);
+    playerRespawnTimer = null;
   }
+  playerRespawning = false;
+  if (overlay) {
+    overlay.classList.remove('overlay--loading');
+  }
+  showSpinner(false);
+  overlay.hidden = false;
 
   const title = outcome === 'player' ? '승리!' : outcome === 'rival' ? '패배' : '무승부';
   const aliveRivals = rivals.filter((r) => r.active && r.alive);
   const sorted = [...aliveRivals].sort((a, b) => b.score - a.score).slice(0, 3);
   const rivalSummary = sorted.length
-    ? `<p>상위 경쟁자: ${sorted
+    ? `<p>상위 경쟁지렁이: ${sorted
         .map((r, idx) => `${idx + 1}위 ${r.score}점`)
         .join(', ')}</p>`
     : '';
@@ -1323,6 +1419,6 @@ function clamp(value, min, max) {
 handleResize();
 overlay.hidden = false;
 overlayContent.innerHTML = rivalEnabled
-  ? '<h2>지렁이 아케이드</h2><p>경쟁자를 켜고 우위를 지키세요!<br/>게임 시작을 눌러 대비하세요.</p>'
+  ? '<h2>지렁이 아케이드</h2><p>경쟁지렁이를 켜고 우위를 지키세요!<br/>게임 시작을 눌러 대비하세요.</p>'
   : '<h2>지렁이 아케이드</h2><p>먹이를 먹고 파워업을 활용해 생존하세요!<br/>스페셜 먹이와 보스 웨이브를 조심!</p>';
 startButton.textContent = '게임 시작';

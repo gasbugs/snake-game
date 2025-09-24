@@ -75,28 +75,40 @@ body {
   z-index: 2;
 }
 
-.status-banner {
+.status-log {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  min-width: 160px;
-  padding: 0.6rem 0.9rem;
-  background: rgba(15, 23, 42, 0.82);
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  color: #f8fafc;
-  font-size: 0.85rem;
-  text-align: right;
-  opacity: 0;
-  transform: translateY(-10px);
+  width: 220px;
+  max-width: calc(100% - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 2;
+  align-items: stretch;
 }
 
-.status-banner.visible {
-  opacity: 1;
-  transform: translateY(0);
+.status-log__entry {
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  padding: 0.55rem 0.8rem;
+  color: #f8fafc;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: right;
+  box-shadow: 0 4px 12px rgba(8, 13, 23, 0.35);
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: log-enter 0.18s ease forwards;
+  width: 100%;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+
+.status-log__entry--removing {
+  animation: log-exit 0.18s ease forwards;
 }
 
 .leaderboard h3 {
@@ -172,6 +184,28 @@ body {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes log-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes log-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
   }
 }
 
